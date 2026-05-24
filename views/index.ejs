@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Partituras EMMFAB</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+  <nav class="bg-purple-800 text-white p-4 shadow-lg sticky top-0 z-10">
+    <div class="container mx-auto flex flex-wrap justify-between items-center">
+      <div class="flex items-center gap-2">
+        <img src="/img/logo-emmfab.png" class="h-10 w-10 rounded-full" onerror="this.src='https://via.placeholder.com/40'">
+        <span class="font-bold text-xl">EMMFAB · Biblioteca</span>
+      </div>
+      <div class="flex gap-4">
+        <% if (isAdmin) { %>
+          <a href="/admin" class="bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded">Admin</a>
+        <% } %>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded">Salir</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-8">
+    <div class="relative rounded-2xl overflow-hidden mb-8 shadow-xl">
+      <img src="/img/carnaval-header.jpg" class="w-full h-48 object-cover" onerror="this.src='https://placehold.co/1200x300?text=Carnaval+de+Oruro'">
+      <div class="absolute inset-0 bg-black/40 flex items-center justify-center">
+        <h2 class="text-white text-3xl md:text-5xl font-bold drop-shadow">🎵 Ritmos de mi tierra 🎵</h2>
+      </div>
+    </div>
+
+    <!-- Filtro por ritmo -->
+    <div class="bg-white p-4 rounded-xl shadow mb-8">
+      <h3 class="font-bold text-lg mb-3 flex items-center gap-2">🎭 Clasificación por ritmo</h3>
+      <div class="flex flex-wrap gap-2">
+        <a href="/?rhythm=&instrument=<%= selectedInstrument %>" class="px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300 <%= !selectedRhythm ? 'bg-purple-600 text-white' : '' %>">Todos</a>
+        <% rhythms.forEach(r => { %>
+          <a href="/?rhythm=<%= encodeURIComponent(r.name) %>&instrument=<%= selectedInstrument %>" 
+             class="px-4 py-2 rounded-full <%= selectedRhythm === r.name ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">
+            <%= r.name %>
+          </a>
+        <% }) %>
+      </div>
+    </div>
+
+    <!-- Filtro por especialidad (trompeta/barítono) -->
+    <div class="bg-white p-4 rounded-xl shadow mb-8">
+      <h3 class="font-bold text-lg mb-3 flex items-center gap-2">🎺 Especialidad</h3>
+      <div class="flex flex-wrap gap-2">
+        <a href="/?rhythm=<%= selectedRhythm %>&instrument=todos" class="px-4 py-2 rounded-full <%= selectedInstrument === 'todos' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">Todos</a>
+        <a href="/?rhythm=<%= selectedRhythm %>&instrument=trompeta" class="px-4 py-2 rounded-full <%= selectedInstrument === 'trompeta' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">🎺 Trompeta</a>
+        <a href="/?rhythm=<%= selectedRhythm %>&instrument=baritono" class="px-4 py-2 rounded-full <%= selectedInstrument === 'baritono' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">🎷 Barítono</a>
+      </div>
+    </div>
+
+    <!-- Lista de partituras -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <% if (scores.length === 0) { %>
+        <div class="col-span-full text-center py-12 bg-white rounded-xl shadow">
+          <p class="text-gray-500 text-lg">📭 No hay partituras disponibles con estos filtros.</p>
+          <% if (isAdmin) { %>
+            <a href="/admin" class="inline-block mt-4 bg-purple-600 text-white px-4 py-2 rounded">Subir primera partitura</a>
+          <% } %>
+        </div>
+      <% } else { %>
+        <% scores.forEach(score => { %>
+          <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition">
+            <div class="p-5">
+              <div class="flex justify-between items-start">
+                <h3 class="font-bold text-xl text-purple-800"><%= score.title %></h3>
+                <span class="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full"><%= score.rhythm_name %></span>
+              </div>
+              <p class="text-gray-500 text-sm mt-2">
+                🎵 <%= score.instrument === 'ambos' ? 'Trompeta y Barítono' : (score.instrument === 'trompeta' ? 'Trompeta' : 'Barítono') %>
+              </p>
+              <p class="text-gray-500 text-sm">📅 <%= new Date(score.upload_date).toLocaleDateString() %></p>
+              <div class="mt-4">
+                <a href="/download/<%= score.id %>" class="inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg w-full text-center">📥 Descargar PDF</a>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+  </div>
+  <footer class="text-center text-gray-500 text-sm py-6 border-t mt-8">
+    Biblioteca EMMFAB - Música del Carnaval de Oruro 🇧🇴
+  </footer>
+</body>
+</html>

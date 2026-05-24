@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Biblioteca EMMFAB - Iniciar sesión</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('/img/carnaval-bg.jpg');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+    }
+  </style>
+</head>
+<body class="h-screen flex items-center justify-center">
+  <div class="bg-white/90 backdrop-blur-sm p-8 rounded-2xl shadow-2xl w-full max-w-md mx-4">
+    <div class="text-center mb-6">
+      <img src="/img/logo-emmfab.png" alt="EMMFAB" class="w-24 h-24 mx-auto rounded-full shadow-md" onerror="this.src='https://via.placeholder.com/96?text=EMMFAB'">
+      <h1 class="text-3xl font-bold text-purple-800 mt-4">📚 Biblioteca EMMFAB</h1>
+      <p class="text-gray-600">Partituras · Trompeta · Barítono</p>
+      <p class="text-sm text-amber-700 mt-1">🎺 Carnaval de Oruro 🎶</p>
+    </div>
+
+    <% if (error) { %>
+      <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 mb-4 rounded"><%= error %></div>
+    <% } %>
+
+    <form method="POST" action="/login">
+      <div class="mb-4">
+        <label class="block text-gray-700 font-bold mb-2">Usuario</label>
+        <input type="text" name="username" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+      </div>
+      <div class="mb-6">
+        <label class="block text-gray-700 font-bold mb-2">Contraseña</label>
+        <input type="password" name="password" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+      </div>
+      <button type="submit" class="w-full bg-purple-700 hover:bg-purple-800 text-white font-bold py-2 px-4 rounded-lg transition duration-200">Ingresar</button>
+    </form>
+    <p class="text-center text-xs text-gray-500 mt-6">Usuarios: EMMFAB/2026 | Acceso solo para miembros</p>
+  </div>
+</body>
+</html>

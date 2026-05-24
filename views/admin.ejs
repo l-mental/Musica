@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Panel de Administración EMMFAB</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+  <nav class="bg-purple-900 text-white p-4 shadow-lg">
+    <div class="container mx-auto flex flex-wrap justify-between items-center">
+      <span class="font-bold text-xl">🔐 Panel Administrativo</span>
+      <div>
+        <a href="/" class="bg-purple-700 hover:bg-purple-800 px-3 py-1 rounded mr-2">Inicio</a>
+        <a href="/compose" class="bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded mr-2">🎼 Componer</a>
+        <a href="/logout" class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded">Cerrar sesión</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto p-4 md:p-8">
+    <h1 class="text-3xl font-bold text-purple-800 mb-6">📌 Gestión de la Biblioteca</h1>
+
+    <% if (error) { %>
+      <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 mb-4 rounded"><%= error %></div>
+    <% } %>
+    <% if (success) { %>
+      <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-3 mb-4 rounded"><%= success %></div>
+    <% } %>
+
+    <div class="grid md:grid-cols-2 gap-8">
+      <!-- Agregar ritmo -->
+      <div class="bg-white p-5 rounded-xl shadow">
+        <h2 class="text-xl font-bold mb-4">➕ Agregar nuevo ritmo / clasificación</h2>
+        <form method="POST" action="/admin/add-rhythm">
+          <input type="text" name="rhythmName" placeholder="Ejemplo: Huayno, Saya, Caporales..." class="w-full border p-2 rounded mb-3" required>
+          <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Guardar ritmo</button>
+        </form>
+        <div class="mt-4">
+          <h3 class="font-semibold">Ritmos existentes:</h3>
+          <ul class="list-disc pl-5 mt-1">
+            <% rhythms.forEach(r => { %>
+              <li><%= r.name %></li>
+            <% }) %>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Subir partitura -->
+      <div class="bg-white p-5 rounded-xl shadow">
+        <h2 class="text-xl font-bold mb-4">📤 Subir nueva partitura (PDF)</h2>
+        <form method="POST" action="/admin/upload-score" enctype="multipart/form-data">
+          <input type="text" name="title" placeholder="Título de la obra" class="w-full border p-2 rounded mb-3" required>
+          <select name="rhythmId" class="w-full border p-2 rounded mb-3" required>
+            <option value="">Seleccionar ritmo</option>
+            <% rhythms.forEach(r => { %>
+              <option value="<%= r.id %>"><%= r.name %></option>
+            <% }) %>
+          </select>
+          <!-- Selector de instrumento (especialidad) -->
+          <select name="instrument" class="w-full border p-2 rounded mb-3" required>
+            <option value="">Seleccionar instrumento</option>
+            <option value="trompeta">🎺 Trompeta</option>
+            <option value="baritono">🎷 Barítono</option>
+            <option value="ambos">🎺🎷 Ambos</option>
+          </select>
+          <input type="file" name="pdf" accept="application/pdf" class="w-full border p-2 rounded mb-3" required>
+          <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full">Subir PDF</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Lista de partituras -->
+    <div class="mt-10 bg-white p-5 rounded-xl shadow overflow-x-auto">
+      <h2 class="text-xl font-bold mb-3">📄 Partituras en el sistema</h2>
+      <table class="w-full text-sm">
+        <thead class="bg-gray-200">
+          <tr>
+            <th class="p-2 text-left">ID</th>
+            <th class="p-2 text-left">Título</th>
+            <th class="p-2 text-left">Instrumento</th>
+            <th class="p-2 text-left">Archivo</th>
+            <th class="p-2 text-left">Ritmo</th>
+            <th class="p-2 text-left">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (scores.length === 0) { %>
+            <tr><td colspan="6" class="text-center p-4 text-gray-500">No hay partituras aún.<?td></tr>
+          <% } else { %>
+            <% scores.forEach(score => { 
+               const rhythmName = rhythms.find(r => r.id === score.rhythm_id)?.name || '?';
+               const instrumentName = score.instrument === 'ambos' ? 'Trompeta y Barítono' : (score.instrument === 'trompeta' ? 'Trompeta' : 'Barítono');
+            %>
+              <tr class="border-b">
+                <td class="p-2"><%= score.id %></td>
+                <td class="p-2"><%= score.title %></td>
+                <td class="p-2"><%= instrumentName %></td>
+                <td class="text-xs truncate max-w-[150px]"><%= score.filename %></td>
+                <td class="p-2"><%= rhythmName %></td>
+                <td class="p-2"><a href="/download/<%= score.id %>" class="text-blue-600 hover:underline">Descargar</a></td>
+              </tr>
+            <% }) %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

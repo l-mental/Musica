@@ -1,0 +1,16 @@
+/* Estilos adicionales para la biblioteca */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+.btn-download {
+    transition: transform 0.2s;
+}
+.btn-download:hover {
+    transform: scale(1.02);
+}
+.card-partitura {
+    transition: box-shadow 0.3s ease;
+}
+.card-partitura:hover {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+}
