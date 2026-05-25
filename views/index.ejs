@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>Partituras EMMFAB</title>
+  <title>biblioteca digital de partituras EMMFAB</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100">
@@ -32,8 +32,8 @@
 
     <!-- Filtro por ritmo -->
     <div class="bg-white p-4 rounded-xl shadow mb-8">
-      <h3 class="font-bold text-lg mb-3 flex items-center gap-2">🎭 Clasificación por ritmo</h3>
-      <div class="flex flex-wrap gap-2">
+      <h3 class="font-bold text-lg mb-3">🎭 Clasificación por ritmo</h3>
+      <div class="flex flex-wrap gap-2 max-h-60 overflow-y-auto pb-2">
         <a href="/?rhythm=&instrument=<%= selectedInstrument %>" class="px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300 <%= !selectedRhythm ? 'bg-purple-600 text-white' : '' %>">Todos</a>
         <% rhythms.forEach(r => { %>
           <a href="/?rhythm=<%= encodeURIComponent(r.name) %>&instrument=<%= selectedInstrument %>" 
@@ -44,14 +44,19 @@
       </div>
     </div>
 
-    <!-- Filtro por especialidad (trompeta/barítono) -->
+    <!-- Filtro por especialidad -->
     <div class="bg-white p-4 rounded-xl shadow mb-8">
-      <h3 class="font-bold text-lg mb-3 flex items-center gap-2">🎺 Especialidad</h3>
+      <h3 class="font-bold text-lg mb-3">🎺 Especialidad</h3>
       <div class="flex flex-wrap gap-2">
         <a href="/?rhythm=<%= selectedRhythm %>&instrument=todos" class="px-4 py-2 rounded-full <%= selectedInstrument === 'todos' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">Todos</a>
         <a href="/?rhythm=<%= selectedRhythm %>&instrument=trompeta" class="px-4 py-2 rounded-full <%= selectedInstrument === 'trompeta' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">🎺 Trompeta</a>
         <a href="/?rhythm=<%= selectedRhythm %>&instrument=baritono" class="px-4 py-2 rounded-full <%= selectedInstrument === 'baritono' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">🎷 Barítono</a>
       </div>
+    </div>
+
+    <!-- Contador de resultados -->
+    <div class="mb-4 text-right text-sm text-gray-500">
+      <%= scores.length %> partitura(s) encontrada(s)
     </div>
 
     <!-- Lista de partituras -->
