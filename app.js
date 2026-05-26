@@ -98,7 +98,7 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// RUTAS
+// ========== RUTAS ==========
 app.get('/login', (req, res) => {
   res.render('login', { error: null });
 });
@@ -255,7 +255,6 @@ app.post('/admin/edit-score/:id', requireLogin, requireAdmin, async (req, res) =
   scores[index].rhythm_id = parseInt(rhythmId);
   scores[index].instrument = instrument;
   await writeJSON(SCORES_FILE, scores);
-  // Redirigir a la página que originó la petición (puede ser / o /admin)
   const referer = req.headers.referer || '/admin';
   res.redirect(referer);
 });
@@ -278,11 +277,18 @@ app.get('/compose', requireLogin, requireAdmin, (req, res) => {
   res.render('compose', { error: null });
 });
 
-initDataFiles().then(() => {
-  app.listen(PORT, () => {
-    console.log(`✅ Servidor en http://localhost:${PORT}`);
-  });
-}).catch(err => {
-  console.error('Error crítico:', err);
-  process.exit(1);
+// ========== INICIALIZACIÓN Y EXPORTACIÓN ==========
+// Inicializar archivos de datos (sin iniciar el servidor aún)
+initDataFiles().catch(err => {
+  console.error('Error inicializando datos:', err);
 });
+
+// Si este archivo se ejecuta directamente (local), iniciar el servidor
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`✅ Servidor local en http://localhost:${PORT}`);
+  });
+}
+
+// Exportar la app para Vercel (y otros entornos serverless)
+module.exports = app;
