@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body {
-      background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('/img/carnaval-bg.jpg');
+      background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('/img/FABFONDO.jpg');
       background-size: cover;
       background-position: center;
       background-attachment: fixed;
@@ -17,8 +17,10 @@
 <body class="h-screen flex items-center justify-center">
   <div class="bg-white/90 backdrop-blur-sm p-8 rounded-2xl shadow-2xl w-full max-w-md mx-4">
     <div class="text-center mb-6">
-      <img src="/img/FABLOGO.jpeg" alt="EMMFAB" class="w-24 h-24 mx-auto rounded-full shadow-md" onerror="this.src='https://via.placeholder.com/96?text=EMMFAB'">
-      <h1 class="text-3xl font-bold text-purple-800 mt-4"> Biblioteca digital de partituras EMMFAB</h1>
+      <div class="w-24 h-24 mx-auto rounded-full shadow-md overflow-hidden bg-purple-100 flex items-center justify-center">
+        <img src="/img/FABFONDO.jpg" alt="EMMFAB" class="w-full h-full object-cover">
+      </div>
+      <h1 class="text-3xl font-bold text-purple-800 mt-4">Biblioteca digital de partituras EMMFAB</h1>
       <p class="text-gray-600">Partituras · Trompeta · Barítono</p>
       <p class="text-sm text-amber-700 mt-1">🎺 Carnaval de Oruro 🎶</p>
     </div>
