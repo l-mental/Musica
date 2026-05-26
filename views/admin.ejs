@@ -36,17 +36,9 @@
           <input type="text" name="rhythmName" placeholder="Ej: Huayno, Saya..." class="w-full border p-2 rounded mb-3" required>
           <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Guardar ritmo</button>
         </form>
-        <div class="mt-4">
-          <h3 class="font-semibold">Ritmos existentes (<%= rhythms.length %>):</h3>
-          <ul class="list-disc pl-5 mt-1 max-h-40 overflow-y-auto">
-            <% rhythms.forEach(r => { %>
-              <li><%= r.name %></li>
-            <% }) %>
-          </ul>
-        </div>
       </div>
 
-      <!-- Subir partitura (permite múltiples) -->
+      <!-- Subir partitura -->
       <div class="bg-white p-5 rounded-xl shadow">
         <h2 class="text-xl font-bold mb-4">📤 Subir nueva partitura (PDF)</h2>
         <form method="POST" action="/admin/upload-score" enctype="multipart/form-data">
@@ -66,11 +58,28 @@
           <input type="file" name="pdf" accept="application/pdf" class="w-full border p-2 rounded mb-3" required>
           <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full">Subir PDF</button>
         </form>
-        <p class="text-xs text-gray-500 mt-3">✅ Puedes subir cuantas partituras quieras. Cada una aparecerá abajo.</p>
       </div>
     </div>
 
-    <!-- Tabla de todas las partituras -->
+    <!-- Lista de ritmos con opciones editar/eliminar -->
+    <div class="mt-10 bg-white p-5 rounded-xl shadow">
+      <h2 class="text-xl font-bold mb-3">🎵 Ritmos existentes (<%= rhythms.length %>)</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <% rhythms.forEach(r => { %>
+          <div class="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
+            <span class="font-medium"><%= r.name %></span>
+            <div>
+              <button onclick="editRhythm(<%= r.id %>, '<%= r.name.replace(/'/g, "\\'") %>')" class="text-blue-600 hover:text-blue-800 mr-2">✏️ Editar</button>
+              <form method="POST" action="/admin/delete-rhythm/<%= r.id %>" class="inline" onsubmit="return confirm('¿Eliminar ritmo <%= r.name %>? Solo si no tiene partituras asociadas.');">
+                <button type="submit" class="text-red-600 hover:text-red-800">🗑️ Eliminar</button>
+              </form>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <!-- Tabla de partituras con opciones editar/eliminar -->
     <div class="mt-10 bg-white p-5 rounded-xl shadow overflow-x-auto">
       <h2 class="text-xl font-bold mb-3">📄 Partituras en el sistema (<%= scores.length %> total)</h2>
       <table class="w-full text-sm">
@@ -81,12 +90,12 @@
             <th class="p-2">Instrumento</th>
             <th class="p-2">Ritmo</th>
             <th class="p-2">Fecha</th>
-            <th class="p-2">Acción</th>
+            <th class="p-2">Acciones</th>
           </tr>
         </thead>
         <tbody>
           <% if (scores.length === 0) { %>
-            <tr><td colspan="6" class="text-center p-4 text-gray-500">No hay partituras aún. Sube una arriba.</td></tr>
+            <tr><td colspan="6" class="text-center p-4">No hay partituras aún. Sube una arriba.</td></tr>
           <% } else { %>
             <% scores.forEach(score => { 
                const rhythmName = rhythms.find(r => r.id === score.rhythm_id)?.name || '?';
@@ -98,13 +107,87 @@
                 <td class="p-2"><%= instrumentName %></td>
                 <td class="p-2"><%= rhythmName %></td>
                 <td class="p-2"><%= new Date(score.upload_date).toLocaleDateString() %></td>
-                <td class="p-2"><a href="/download/<%= score.id %>" class="text-blue-600 hover:underline">Descargar</a></td>
-              </tr>
+                <td class="p-2">
+                  <button onclick="editScore(<%= score.id %>, '<%= score.title.replace(/'/g, "\\'") %>', <%= score.rhythm_id %>, '<%= score.instrument %>')" class="text-blue-600 hover:text-blue-800 mr-2">✏️ Editar</button>
+                  <form method="POST" action="/admin/delete-score/<%= score.id %>" class="inline" onsubmit="return confirm('¿Eliminar partitura <%= score.title %>? Se borrará el archivo PDF.');">
+                    <button type="submit" class="text-red-600 hover:text-red-800">🗑️ Eliminar</button>
+                  </form>
+                </td>
+               </tr>
             <% }) %>
           <% } %>
         </tbody>
-      </table>
+       </table>
     </div>
   </div>
+
+  <!-- Modal para editar ritmo -->
+  <div id="editRhythmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-96">
+      <h3 class="text-xl font-bold mb-4">Editar ritmo</h3>
+      <form id="editRhythmForm" method="POST">
+        <input type="text" name="newName" id="editRhythmName" class="w-full border p-2 rounded mb-4" required>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="closeModal('editRhythmModal')" class="bg-gray-300 px-4 py-2 rounded">Cancelar</button>
+          <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal para editar partitura -->
+  <div id="editScoreModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-96">
+      <h3 class="text-xl font-bold mb-4">Editar partitura</h3>
+      <form id="editScoreForm" method="POST">
+        <input type="text" name="title" id="editScoreTitle" placeholder="Título" class="w-full border p-2 rounded mb-3" required>
+        <select name="rhythmId" id="editScoreRhythm" class="w-full border p-2 rounded mb-3" required>
+          <option value="">Seleccionar ritmo</option>
+          <% rhythms.forEach(r => { %>
+            <option value="<%= r.id %>"><%= r.name %></option>
+          <% }) %>
+        </select>
+        <select name="instrument" id="editScoreInstrument" class="w-full border p-2 rounded mb-3" required>
+          <option value="trompeta">🎺 Trompeta</option>
+          <option value="baritono">🎷 Barítono</option>
+          <option value="ambos">🎺🎷 Ambos</option>
+        </select>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="closeModal('editScoreModal')" class="bg-gray-300 px-4 py-2 rounded">Cancelar</button>
+          <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function editRhythm(id, name) {
+      const form = document.getElementById('editRhythmForm');
+      form.action = `/admin/edit-rhythm/${id}`;
+      document.getElementById('editRhythmName').value = name;
+      document.getElementById('editRhythmModal').classList.remove('hidden');
+      document.getElementById('editRhythmModal').classList.add('flex');
+    }
+    function editScore(id, title, rhythmId, instrument) {
+      const form = document.getElementById('editScoreForm');
+      form.action = `/admin/edit-score/${id}`;
+      document.getElementById('editScoreTitle').value = title;
+      document.getElementById('editScoreRhythm').value = rhythmId;
+      document.getElementById('editScoreInstrument').value = instrument;
+      document.getElementById('editScoreModal').classList.remove('hidden');
+      document.getElementById('editScoreModal').classList.add('flex');
+    }
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.add('hidden');
+      document.getElementById(modalId).classList.remove('flex');
+    }
+    // Cerrar modal al hacer clic fuera
+    window.onclick = function(event) {
+      if (event.target.classList.contains('fixed')) {
+        event.target.classList.add('hidden');
+        event.target.classList.remove('flex');
+      }
+    }
+  </script>
 </body>
 </html>

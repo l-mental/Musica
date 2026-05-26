@@ -146,8 +146,7 @@ app.get('/', requireLogin, async (req, res) => {
       rhythms,
       selectedRhythm: rhythm || '',
       selectedInstrument: instrument || 'todos',
-      isAdmin: req.session.user.role === 'admin',
-      totalScores: filteredScores.length
+      isAdmin: req.session.user.role === 'admin'
     });
   } catch (err) {
     console.error(err);
@@ -164,36 +163,68 @@ app.get('/download/:id', requireLogin, async (req, res) => {
   else res.status(404).send('Archivo no encontrado');
 });
 
+// Panel admin
 app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
   const rhythms = await safeReadJSON(RHYTHMS_FILE, []);
   const scores = await safeReadJSON(SCORES_FILE, []);
   res.render('admin', { rhythms, scores, error: null, success: null });
 });
 
+// Agregar ritmo
 app.post('/admin/add-rhythm', requireLogin, requireAdmin, async (req, res) => {
   const { rhythmName } = req.body;
   if (!rhythmName || rhythmName.trim() === '') {
-    const rhythms = await safeReadJSON(RHYTHMS_FILE, []);
-    const scores = await safeReadJSON(SCORES_FILE, []);
-    return res.render('admin', { rhythms, scores, error: 'Nombre vacío', success: null });
+    return res.redirect('/admin?error=El nombre no puede estar vacío');
   }
   const rhythms = await safeReadJSON(RHYTHMS_FILE, []);
   if (rhythms.some(r => r.name.toLowerCase() === rhythmName.trim().toLowerCase())) {
-    const scores = await safeReadJSON(SCORES_FILE, []);
-    return res.render('admin', { rhythms, scores, error: 'Ese ritmo ya existe', success: null });
+    return res.redirect('/admin?error=Ese ritmo ya existe');
   }
   const newId = rhythms.length ? Math.max(...rhythms.map(r => r.id)) + 1 : 1;
   rhythms.push({ id: newId, name: rhythmName.trim() });
   await writeJSON(RHYTHMS_FILE, rhythms);
-  res.redirect('/admin');
+  res.redirect('/admin?success=Ritmo agregado correctamente');
 });
 
+// Editar ritmo
+app.post('/admin/edit-rhythm/:id', requireLogin, requireAdmin, async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { newName } = req.body;
+  if (!newName || newName.trim() === '') {
+    return res.redirect('/admin?error=El nombre no puede estar vacío');
+  }
+  const rhythms = await safeReadJSON(RHYTHMS_FILE, []);
+  const index = rhythms.findIndex(r => r.id === id);
+  if (index === -1) return res.redirect('/admin?error=Ritmo no encontrado');
+  if (rhythms.some(r => r.id !== id && r.name.toLowerCase() === newName.trim().toLowerCase())) {
+    return res.redirect('/admin?error=Ya existe otro ritmo con ese nombre');
+  }
+  rhythms[index].name = newName.trim();
+  await writeJSON(RHYTHMS_FILE, rhythms);
+  res.redirect('/admin?success=Ritmo editado correctamente');
+});
+
+// Eliminar ritmo
+app.post('/admin/delete-rhythm/:id', requireLogin, requireAdmin, async (req, res) => {
+  const id = parseInt(req.params.id);
+  let rhythms = await safeReadJSON(RHYTHMS_FILE, []);
+  const rhythmToDelete = rhythms.find(r => r.id === id);
+  if (!rhythmToDelete) return res.redirect('/admin?error=Ritmo no encontrado');
+  let scores = await safeReadJSON(SCORES_FILE, []);
+  const hasScores = scores.some(s => s.rhythm_id === id);
+  if (hasScores) {
+    return res.redirect('/admin?error=No se puede eliminar el ritmo porque tiene partituras asociadas. Elimina primero las partituras.');
+  }
+  rhythms = rhythms.filter(r => r.id !== id);
+  await writeJSON(RHYTHMS_FILE, rhythms);
+  res.redirect('/admin?success=Ritmo eliminado');
+});
+
+// Subir partitura
 app.post('/admin/upload-score', requireLogin, requireAdmin, upload.single('pdf'), async (req, res) => {
   const { title, rhythmId, instrument } = req.body;
   if (!req.file || !title || !rhythmId || !instrument) {
-    const rhythms = await safeReadJSON(RHYTHMS_FILE, []);
-    const scores = await safeReadJSON(SCORES_FILE, []);
-    return res.render('admin', { rhythms, scores, error: 'Complete todos los campos y seleccione PDF', success: null });
+    return res.redirect('/admin?error=Complete todos los campos y seleccione un PDF');
   }
   const scores = await safeReadJSON(SCORES_FILE, []);
   const newId = scores.length ? Math.max(...scores.map(s => s.id)) + 1 : 1;
@@ -207,8 +238,40 @@ app.post('/admin/upload-score', requireLogin, requireAdmin, upload.single('pdf')
   };
   scores.push(newScore);
   await writeJSON(SCORES_FILE, scores);
-  console.log(`Partitura guardada: ${newScore.title} (ID ${newId})`);
-  res.redirect('/admin');
+  res.redirect('/admin?success=Partitura subida correctamente');
+});
+
+// Editar partitura
+app.post('/admin/edit-score/:id', requireLogin, requireAdmin, async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { title, rhythmId, instrument } = req.body;
+  if (!title || !rhythmId || !instrument) {
+    return res.redirect('/admin?error=Complete todos los campos');
+  }
+  let scores = await safeReadJSON(SCORES_FILE, []);
+  const index = scores.findIndex(s => s.id === id);
+  if (index === -1) return res.redirect('/admin?error=Partitura no encontrada');
+  scores[index].title = title.trim();
+  scores[index].rhythm_id = parseInt(rhythmId);
+  scores[index].instrument = instrument;
+  await writeJSON(SCORES_FILE, scores);
+  // Redirigir a la página que originó la petición (puede ser / o /admin)
+  const referer = req.headers.referer || '/admin';
+  res.redirect(referer);
+});
+
+// Eliminar partitura
+app.post('/admin/delete-score/:id', requireLogin, requireAdmin, async (req, res) => {
+  const id = parseInt(req.params.id);
+  let scores = await safeReadJSON(SCORES_FILE, []);
+  const scoreToDelete = scores.find(s => s.id === id);
+  if (!scoreToDelete) return res.redirect('/admin?error=Partitura no encontrada');
+  const filepath = path.join(UPLOADS_DIR, scoreToDelete.filename);
+  if (fsSync.existsSync(filepath)) fsSync.unlinkSync(filepath);
+  scores = scores.filter(s => s.id !== id);
+  await writeJSON(SCORES_FILE, scores);
+  const referer = req.headers.referer || '/admin';
+  res.redirect(referer);
 });
 
 app.get('/compose', requireLogin, requireAdmin, (req, res) => {
