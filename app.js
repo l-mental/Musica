@@ -8,6 +8,20 @@ const fsSync = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ========== CONFIGURACIÓN DE ALMACENAMIENTO PERSISTENTE ==========
+// Puedes cambiar la carpeta raíz con la variable de entorno STORAGE_PATH
+// En Railway, crea un volumen montado en /app/storage y define STORAGE_PATH=/app/storage
+const STORAGE_ROOT = process.env.STORAGE_PATH || path.join(__dirname, 'storage');
+const DATA_DIR = path.join(STORAGE_ROOT, 'data');
+const UPLOADS_DIR = path.join(STORAGE_ROOT, 'uploads');
+
+// Asegurar que las carpetas existan (se ejecuta al iniciar)
+async function ensureDirectories() {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.mkdir(UPLOADS_DIR, { recursive: true });
+}
+// ==================================================================
+
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
@@ -20,11 +34,10 @@ app.use(session({
   cookie: { maxAge: 3600000 }
 }));
 
-const DATA_DIR = path.join(__dirname, 'data');
+// Archivos JSON dentro de DATA_DIR
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const RHYTHMS_FILE = path.join(DATA_DIR, 'rhythms.json');
 const SCORES_FILE = path.join(DATA_DIR, 'scores.json');
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
 
 async function safeReadJSON(filePath, defaultData) {
   try {
@@ -46,8 +59,7 @@ async function writeJSON(filePath, data) {
 }
 
 async function initDataFiles() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.mkdir(UPLOADS_DIR, { recursive: true });
+  await ensureDirectories();
 
   const defaultUsers = [
     { id: 1, username: 'EMMFAB', password: '2026', role: 'user' },
@@ -73,6 +85,7 @@ async function initDataFiles() {
   await safeReadJSON(SCORES_FILE, []);
 }
 
+// Configuración de multer para guardar PDFs en disco (persistente)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => {
@@ -163,7 +176,6 @@ app.get('/download/:id', requireLogin, async (req, res) => {
   else res.status(404).send('Archivo no encontrado');
 });
 
-// Panel admin
 app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
   const rhythms = await safeReadJSON(RHYTHMS_FILE, []);
   const scores = await safeReadJSON(SCORES_FILE, []);
@@ -277,18 +289,17 @@ app.get('/compose', requireLogin, requireAdmin, (req, res) => {
   res.render('compose', { error: null });
 });
 
-// ========== INICIALIZACIÓN Y EXPORTACIÓN ==========
-// Inicializar archivos de datos (sin iniciar el servidor aún)
+// ========== INICIALIZACIÓN Y ARRANQUE ==========
 initDataFiles().catch(err => {
   console.error('Error inicializando datos:', err);
+  process.exit(1);
 });
 
-// Si este archivo se ejecuta directamente (local), iniciar el servidor
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`✅ Servidor local en http://localhost:${PORT}`);
+    console.log(`📁 Datos guardados en: ${STORAGE_ROOT}`);
   });
 }
 
-// Exportar la app para Vercel (y otros entornos serverless)
 module.exports = app;
