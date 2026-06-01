@@ -5,12 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>biblioteca digital de partituras EMMFAB</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Fondo con logo (watermark) */
+    body {
+      background-image: url('/img/logo-fondo.png');
+      background-repeat: repeat;
+      background-size: 80px;
+      background-attachment: fixed;
+    }
+    /* Para mejorar la legibilidad, las tarjetas tendrán fondo blanco semi-transparente */
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(2px);
+    }
+    /* Estilo del visor PDF en el modal */
+    .pdf-viewer {
+      width: 100%;
+      height: 80vh;
+      border: none;
+    }
+  </style>
 </head>
 <body class="bg-gray-100">
+  <% 
+    scores = typeof scores !== 'undefined' ? scores : [];
+    rhythms = typeof rhythms !== 'undefined' ? rhythms : [];
+    selectedInstrument = typeof selectedInstrument !== 'undefined' ? selectedInstrument : 'todos';
+    selectedRhythm = typeof selectedRhythm !== 'undefined' ? selectedRhythm : '';
+    isAdmin = !!isAdmin;
+    function escForOnclick(str){ return String(str||'').replace(/'/g, "\\'" ).replace(/\"/g, '&quot;').replace(/\n/g,' ').replace(/\r/g,''); }
+  %>
   <nav class="bg-purple-800 text-white p-4 shadow-lg sticky top-0 z-10">
     <div class="container mx-auto flex flex-wrap justify-between items-center">
       <div class="flex items-center gap-2">
-        <img src="/img/logo-emmfab.png" class="h-10 w-10 rounded-full" onerror="this.src='https://via.placeholder.com/40'">
+        <img src="/img/FABLOGO.jpeg" class="h-10 w-10 rounded-full object-cover" onerror="this.src='https://via.placeholder.com/40'">
         <span class="font-bold text-xl">EMMFAB · Biblioteca</span>
       </div>
       <div class="flex gap-4">
@@ -23,6 +51,7 @@
   </nav>
 
   <div class="container mx-auto px-4 py-8">
+    <!-- Encabezado con imagen de carnaval -->
     <div class="relative rounded-2xl overflow-hidden mb-8 shadow-xl">
       <img src="/img/carnaval-header.jpg" class="w-full h-48 object-cover" onerror="this.src='https://placehold.co/1200x300?text=Carnaval+de+Oruro'">
       <div class="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -30,30 +59,27 @@
       </div>
     </div>
 
-    <!-- Botón para agregar partitura (solo admin) -->
-    <% if (isAdmin) { %>
-      <div class="mb-6 text-right">
-        <a href="/admin" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg shadow inline-flex items-center gap-2">
-          ➕ Agregar partitura
-        </a>
-      </div>
-    <% } %>
-
-    <!-- Filtro por ritmo -->
-    <div class="bg-white p-4 rounded-xl shadow mb-8">
-      <h3 class="font-bold text-lg mb-3">🎭 Clasificación por ritmo</h3>
-      <div class="flex flex-wrap gap-2 max-h-60 overflow-y-auto pb-2">
-        <a href="/?rhythm=&instrument=<%= selectedInstrument %>" class="px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300 <%= !selectedRhythm ? 'bg-purple-600 text-white' : '' %>">Todos</a>
-        <% rhythms.forEach(r => { %>
-          <a href="/?rhythm=<%= encodeURIComponent(r.name) %>&instrument=<%= selectedInstrument %>" 
-             class="px-4 py-2 rounded-full <%= selectedRhythm === r.name ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">
-            <%= r.name %>
-          </a>
-        <% }) %>
-      </div>
+    <!-- Mensaje de bienvenida para llenar el vacío -->
+    <div class="bg-purple-100 border-l-4 border-purple-600 text-purple-800 p-4 mb-8 rounded shadow">
+      <p class="font-bold">🎶 Bienvenido a la Biblioteca Digital EMMFAB</p>
+      <p>Aquí encontrarás partituras para trompeta y barítono de los ritmos más representativos del Carnaval de Oruro y música boliviana. Usa los filtros para encontrar la partitura que necesitas.</p>
     </div>
 
-    <!-- Filtro por especialidad -->
+    <!-- Filtros: usamos formulario GET para evitar problemas de rutas -->
+    <div class="bg-white p-4 rounded-xl shadow mb-8">
+      <h3 class="font-bold text-lg mb-3">🎭 Clasificación por ritmo</h3>
+      <form method="GET" action="/" id="filterForm" class="flex flex-wrap gap-2 max-h-60 overflow-y-auto pb-2">
+        <input type="hidden" name="instrument" value="<%= selectedInstrument %>">
+        <button type="submit" name="rhythm" value="" class="px-4 py-2 rounded-full <%= !selectedRhythm ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">Todos</button>
+        <% rhythms.forEach(r => { %>
+          <button type="submit" name="rhythm" value="<%= r.name %>" class="px-4 py-2 rounded-full <%= selectedRhythm === r.name ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">
+            <%= r.name %>
+          </button>
+        <% }) %>
+      </form>
+    </div>
+
+    <!-- Filtro por especialidad (también con botones) -->
     <div class="bg-white p-4 rounded-xl shadow mb-8">
       <h3 class="font-bold text-lg mb-3">🎺 Especialidad</h3>
       <div class="flex flex-wrap gap-2">
@@ -63,10 +89,15 @@
       </div>
     </div>
 
-    <!-- Lista de partituras -->
+    <!-- Contador de resultados -->
+    <div class="text-right text-gray-500 mb-4">
+      <%= scores.length %> partitura(s) encontrada(s)
+    </div>
+
+    <!-- Lista de partituras con vista previa -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <% if (scores.length === 0) { %>
-        <div class="col-span-full text-center py-12 bg-white rounded-xl shadow">
+        <div class="col-span-full text-center py-12 bg-white rounded-xl shadow card">
           <p class="text-gray-500 text-lg">📭 No hay partituras disponibles con estos filtros.</p>
           <% if (isAdmin) { %>
             <a href="/admin" class="inline-block mt-4 bg-purple-600 text-white px-4 py-2 rounded">Subir primera partitura</a>
@@ -74,7 +105,7 @@
         </div>
       <% } else { %>
         <% scores.forEach(score => { %>
-          <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition relative">
+          <div class="card rounded-xl shadow-md overflow-hidden hover:shadow-xl transition">
             <div class="p-5">
               <div class="flex justify-between items-start">
                 <h3 class="font-bold text-xl text-purple-800"><%= score.title %></h3>
@@ -84,11 +115,12 @@
                 🎵 <%= score.instrument === 'ambos' ? 'Trompeta y Barítono' : (score.instrument === 'trompeta' ? 'Trompeta' : 'Barítono') %>
               </p>
               <p class="text-gray-500 text-sm">📅 <%= new Date(score.upload_date).toLocaleDateString() %></p>
-              <div class="mt-4 flex gap-2">
-                <a href="/download/<%= score.id %>" class="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-center">📥 Descargar PDF</a>
+              <div class="mt-4 flex gap-2 flex-wrap">
+                <a href="/download/<%= score.id %>" class="flex-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-center text-sm">📥 Descargar</a>
+                <button onclick="openPDFPreview('/download/<%= score.id %>')" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm">🔍 Vista previa</button>
                 <% if (isAdmin) { %>
-                  <button onclick="openEditModal(<%= score.id %>, '<%= score.title.replace(/'/g, "\\'") %>', <%= score.rhythm_id %>, '<%= score.instrument %>')" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg">✏️</button>
-                  <button onclick="confirmDeleteScore(<%= score.id %>, '<%= score.title.replace(/'/g, "\\'") %>')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg">🗑️</button>
+                  <button type="button" class="edit-score-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg text-sm" data-id="<%= score.id %>" data-title="<%= (score.title||'').replace(/\"/g, '&quot;') %>" data-rhythm="<%= score.rhythm_id %>" data-instrument="<%= score.instrument %>">✏️</button>
+                  <button type="button" class="delete-score-btn bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm" data-id="<%= score.id %>" data-title="<%= (score.title||'').replace(/\"/g, '&quot;') %>">🗑️</button>
                 <% } %>
               </div>
             </div>
@@ -101,6 +133,23 @@
   <footer class="text-center text-gray-500 text-sm py-6 border-t mt-8">
     Biblioteca EMMFAB - Música del Carnaval de Oruro 🇧🇴
   </footer>
+
+  <!-- Modal para vista previa de PDF -->
+  <div id="pdfModal" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg w-full max-w-5xl mx-auto">
+      <div class="flex justify-between items-center p-4 border-b">
+        <h3 class="text-xl font-bold">Vista previa de la partitura</h3>
+        <button onclick="closePDFModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+      </div>
+      <div class="p-2">
+        <iframe id="pdfViewer" class="pdf-viewer" src=""></iframe>
+      </div>
+      <div class="p-3 text-right border-t">
+        <button onclick="closePDFModal()" class="bg-gray-300 px-4 py-2 rounded">Cerrar</button>
+        <a id="downloadLink" href="#" class="bg-green-600 text-white px-4 py-2 rounded ml-2 inline-block">Descargar PDF</a>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal para editar partitura (solo admin) -->
   <div id="editScoreModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
@@ -131,6 +180,24 @@
   <form id="deleteScoreForm" method="POST" style="display: none;"></form>
 
   <script>
+    // Función para abrir modal de PDF
+    function openPDFPreview(downloadUrl) {
+      const modal = document.getElementById('pdfModal');
+      const iframe = document.getElementById('pdfViewer');
+      const downloadLink = document.getElementById('downloadLink');
+      iframe.src = downloadUrl;
+      downloadLink.href = downloadUrl;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+    function closePDFModal() {
+      const modal = document.getElementById('pdfModal');
+      const iframe = document.getElementById('pdfViewer');
+      iframe.src = '';
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+    // Funciones para editar/eliminar (solo admin)
     function openEditModal(id, title, rhythmId, instrument) {
       const form = document.getElementById('editScoreForm');
       form.action = `/admin/edit-score/${id}`;
@@ -158,6 +225,21 @@
         event.target.classList.remove('flex');
       }
     }
+    // Para los filtros con botones, el formulario se envía automáticamente al hacer clic en un botón.
+    // No necesita código adicional.
+    // Manejo de botones de editar/eliminar usando data-attributes para evitar inline onclick
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('.edit-score-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          openEditModal(btn.dataset.id, btn.dataset.title, btn.dataset.rhythm, btn.dataset.instrument);
+        });
+      });
+      document.querySelectorAll('.delete-score-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          confirmDeleteScore(btn.dataset.id, btn.dataset.title);
+        });
+      });
+    });
   </script>
 </body>
 </html>
