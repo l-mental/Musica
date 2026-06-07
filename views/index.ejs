@@ -35,7 +35,16 @@
       <p>Aquí encontrarás partituras para trompeta y barítono de los ritmos del Carnaval de Oruro y música boliviana.</p>
     </div>
 
-    <!-- Filtro por ritmo - usando links GET -->
+    <!-- Botón para agregar partitura (solo admin) -->
+    <% if (isAdmin) { %>
+      <div class="mb-6 text-right">
+        <a href="/admin" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow inline-flex items-center gap-2">
+          ➕ Agregar nueva partitura
+        </a>
+      </div>
+    <% } %>
+
+    <!-- Filtro por ritmo - usando links GET (NO redirige al login) -->
     <div class="bg-white p-4 rounded-xl shadow mb-8">
       <h3 class="font-bold text-lg mb-3">🎭 Clasificación por ritmo</h3>
       <div class="flex flex-wrap gap-2 max-h-60 overflow-y-auto pb-2">

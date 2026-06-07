@@ -141,16 +141,21 @@ app.get('/', requireLogin, async (req, res) => {
 
     const { rhythm, instrument } = req.query;
     let filteredScores = [...scores];
+    
+    // Filtrar por ritmo (solo si rhythm existe y no está vacío)
     if (rhythm && rhythm !== '') {
       const rhythmObj = rhythms.find(r => r.name === rhythm);
       if (rhythmObj) {
         filteredScores = filteredScores.filter(s => s.rhythm_id === rhythmObj.id);
       }
     }
+    
+    // Filtrar por instrumento
     if (instrument && instrument !== '' && instrument !== 'todos') {
       filteredScores = filteredScores.filter(s => s.instrument === instrument || s.instrument === 'ambos');
     }
 
+    // Siempre renderizar la página, nunca redirigir (excepto si no hay sesión - ya lo maneja requireLogin)
     res.render('index', {
       scores: filteredScores,
       rhythms,
@@ -160,7 +165,14 @@ app.get('/', requireLogin, async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).send('Error cargando datos');
+    // En caso de error, mostrar la página igualmente sin partituras
+    res.render('index', {
+      scores: [],
+      rhythms: [],
+      selectedRhythm: '',
+      selectedInstrument: 'todos',
+      isAdmin: req.session.user ? req.session.user.role === 'admin' : false
+    });
   }
 });
 
