@@ -30,12 +30,7 @@
       </div>
     </div>
 
-    <div class="bg-purple-100 border-l-4 border-purple-600 text-purple-800 p-4 mb-8 rounded shadow">
-      <p class="font-bold">🎶 Bienvenido a la Biblioteca Digital EMMFAB</p>
-      <p>Aquí encontrarás partituras para trompeta y barítono de los ritmos del Carnaval de Oruro y música boliviana.</p>
-    </div>
-
-    <!-- Botón para agregar partitura (solo admin) -->
+    <!-- Botón para agregar partitura - SIEMPRE VISIBLE para admin -->
     <% if (isAdmin) { %>
       <div class="mb-6 text-right">
         <a href="/admin" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow inline-flex items-center gap-2">
@@ -44,27 +39,35 @@
       </div>
     <% } %>
 
-    <!-- Filtro por ritmo - usando links GET (NO redirige al login) -->
+    <div class="bg-purple-100 border-l-4 border-purple-600 text-purple-800 p-4 mb-8 rounded shadow">
+      <p class="font-bold">🎶 Bienvenido a la Biblioteca Digital EMMFAB</p>
+      <p>Aquí encontrarás partituras para trompeta y barítono de los ritmos del Carnaval de Oruro y música boliviana.</p>
+    </div>
+
+    <!-- Filtro por ritmo - USANDO FORMULARIO POST para evitar problemas de sesión -->
     <div class="bg-white p-4 rounded-xl shadow mb-8">
       <h3 class="font-bold text-lg mb-3">🎭 Clasificación por ritmo</h3>
       <div class="flex flex-wrap gap-2 max-h-60 overflow-y-auto pb-2">
-        <a href="/?rhythm=&instrument=<%= selectedInstrument %>" class="px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300 <%= !selectedRhythm ? 'bg-purple-600 text-white' : '' %>">Todos</a>
-        <% rhythms.forEach(r => { %>
-          <a href="/?rhythm=<%= encodeURIComponent(r.name) %>&instrument=<%= selectedInstrument %>" 
-             class="px-4 py-2 rounded-full <%= selectedRhythm === r.name ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">
-            <%= r.name %>
-          </a>
-        <% }) %>
+        <form method="GET" action="/" id="filterForm" class="contents">
+          <input type="hidden" name="instrument" id="instrumentInput" value="<%= selectedInstrument %>">
+          <button type="submit" name="rhythm" value="" class="px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300 <%= !selectedRhythm ? 'bg-purple-600 text-white' : '' %>">Todos</button>
+          <% rhythms.forEach(r => { %>
+            <button type="submit" name="rhythm" value="<%= r.name %>" 
+               class="px-4 py-2 rounded-full <%= selectedRhythm === r.name ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">
+              <%= r.name %>
+            </button>
+          <% }) %>
+        </form>
       </div>
     </div>
 
-    <!-- Filtro por especialidad -->
+    <!-- Filtro por especialidad - usando links con JavaScript -->
     <div class="bg-white p-4 rounded-xl shadow mb-8">
       <h3 class="font-bold text-lg mb-3">🎺 Especialidad</h3>
       <div class="flex flex-wrap gap-2">
-        <a href="/?rhythm=<%= selectedRhythm %>&instrument=todos" class="px-4 py-2 rounded-full <%= selectedInstrument === 'todos' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">Todos</a>
-        <a href="/?rhythm=<%= selectedRhythm %>&instrument=trompeta" class="px-4 py-2 rounded-full <%= selectedInstrument === 'trompeta' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">🎺 Trompeta</a>
-        <a href="/?rhythm=<%= selectedRhythm %>&instrument=baritono" class="px-4 py-2 rounded-full <%= selectedInstrument === 'baritono' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">🎷 Barítono</a>
+        <button onclick="filterInstrument('todos')" class="px-4 py-2 rounded-full <%= selectedInstrument === 'todos' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">Todos</button>
+        <button onclick="filterInstrument('trompeta')" class="px-4 py-2 rounded-full <%= selectedInstrument === 'trompeta' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">🎺 Trompeta</button>
+        <button onclick="filterInstrument('baritono')" class="px-4 py-2 rounded-full <%= selectedInstrument === 'baritono' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300' %>">🎷 Barítono</button>
       </div>
     </div>
 
@@ -142,6 +145,11 @@
   <form id="deleteScoreForm" method="POST" style="display: none;"></form>
 
   <script>
+    function filterInstrument(instrument) {
+      const currentRhythm = '<%= selectedRhythm %>';
+      window.location.href = '/?rhythm=' + encodeURIComponent(currentRhythm) + '&instrument=' + instrument;
+    }
+    
     function openEditModal(id, title, rhythmId, instrument) {
       const form = document.getElementById('editScoreForm');
       form.action = `/admin/edit-score/${id}`;
@@ -151,6 +159,7 @@
       document.getElementById('editScoreModal').classList.remove('hidden');
       document.getElementById('editScoreModal').classList.add('flex');
     }
+    
     function confirmDeleteScore(id, title) {
       if (confirm(`¿Eliminar la partitura "${title}"?`)) {
         const form = document.getElementById('deleteScoreForm');
@@ -158,10 +167,12 @@
         form.submit();
       }
     }
+    
     function closeModal(modalId) {
       document.getElementById(modalId).classList.add('hidden');
       document.getElementById(modalId).classList.remove('flex');
     }
+    
     window.onclick = function(event) {
       if (event.target.classList && event.target.classList.contains('fixed')) {
         event.target.classList.add('hidden');

@@ -19,6 +19,14 @@ app.use(session({
   saveUninitialized: false,
   cookie: { maxAge: 3600000 }
 }));
+// Agrega esto después de app.use(session...)
+app.use((req, res, next) => {
+  // Log para depuración - elimina en producción
+  if (req.session.user) {
+    console.log('Usuario logueado:', req.session.user.username);
+  }
+  next();
+});
 
 // Configuración de almacenamiento
 const STORAGE_ROOT = process.env.STORAGE_PATH || path.join(__dirname, 'storage');
