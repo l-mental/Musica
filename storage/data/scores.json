@@ -6,5 +6,13 @@
     "rhythm_id": 1,
     "instrument": "trompeta",
     "upload_date": "2026-06-01T21:23:12.210Z"
+  },
+  {
+    "id": 2,
+    "title": "fdr",
+    "filename": "1780810593119-4fd9e387-c8db-422e-9c1f-c0f3ab4f02a2.pdf",
+    "rhythm_id": 3,
+    "instrument": "trompeta",
+    "upload_date": "2026-06-07T05:36:33.128Z"
   }
 ]

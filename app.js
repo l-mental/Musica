@@ -8,20 +8,6 @@ const fsSync = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ========== CONFIGURACIÓN DE ALMACENAMIENTO PERSISTENTE ==========
-// Puedes cambiar la carpeta raíz con la variable de entorno STORAGE_PATH
-// En Railway, crea un volumen montado en /app/storage y define STORAGE_PATH=/app/storage
-const STORAGE_ROOT = process.env.STORAGE_PATH || path.join(__dirname, 'storage');
-const DATA_DIR = path.join(STORAGE_ROOT, 'data');
-const UPLOADS_DIR = path.join(STORAGE_ROOT, 'uploads');
-
-// Asegurar que las carpetas existan (se ejecuta al iniciar)
-async function ensureDirectories() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.mkdir(UPLOADS_DIR, { recursive: true });
-}
-// ==================================================================
-
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
@@ -34,7 +20,16 @@ app.use(session({
   cookie: { maxAge: 3600000 }
 }));
 
-// Archivos JSON dentro de DATA_DIR
+// Configuración de almacenamiento
+const STORAGE_ROOT = process.env.STORAGE_PATH || path.join(__dirname, 'storage');
+const DATA_DIR = path.join(STORAGE_ROOT, 'data');
+const UPLOADS_DIR = path.join(STORAGE_ROOT, 'uploads');
+
+async function ensureDirectories() {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.mkdir(UPLOADS_DIR, { recursive: true });
+}
+
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const RHYTHMS_FILE = path.join(DATA_DIR, 'rhythms.json');
 const SCORES_FILE = path.join(DATA_DIR, 'scores.json');
@@ -85,7 +80,6 @@ async function initDataFiles() {
   await safeReadJSON(SCORES_FILE, []);
 }
 
-// Configuración de multer para guardar PDFs en disco (persistente)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => {
@@ -105,6 +99,7 @@ function requireLogin(req, res, next) {
   if (!req.session.user) return res.redirect('/login');
   next();
 }
+
 function requireAdmin(req, res, next) {
   if (!req.session.user || req.session.user.role !== 'admin')
     return res.status(403).send('Acceso denegado. Solo administrador.');
@@ -146,11 +141,13 @@ app.get('/', requireLogin, async (req, res) => {
 
     const { rhythm, instrument } = req.query;
     let filteredScores = [...scores];
-    if (rhythm) {
-      const rhythmId = rhythms.find(r => r.name === rhythm)?.id;
-      if (rhythmId) filteredScores = filteredScores.filter(s => s.rhythm_id === rhythmId);
+    if (rhythm && rhythm !== '') {
+      const rhythmObj = rhythms.find(r => r.name === rhythm);
+      if (rhythmObj) {
+        filteredScores = filteredScores.filter(s => s.rhythm_id === rhythmObj.id);
+      }
     }
-    if (instrument && instrument !== 'todos') {
+    if (instrument && instrument !== '' && instrument !== 'todos') {
       filteredScores = filteredScores.filter(s => s.instrument === instrument || s.instrument === 'ambos');
     }
 
@@ -168,12 +165,20 @@ app.get('/', requireLogin, async (req, res) => {
 });
 
 app.get('/download/:id', requireLogin, async (req, res) => {
-  const scores = await safeReadJSON(SCORES_FILE, []);
-  const score = scores.find(s => s.id == req.params.id);
-  if (!score) return res.status(404).send('Partitura no encontrada');
-  const filepath = path.join(UPLOADS_DIR, score.filename);
-  if (fsSync.existsSync(filepath)) res.download(filepath);
-  else res.status(404).send('Archivo no encontrado');
+  try {
+    const scores = await safeReadJSON(SCORES_FILE, []);
+    const score = scores.find(s => s.id == req.params.id);
+    if (!score) return res.status(404).send('Partitura no encontrada');
+    const filepath = path.join(UPLOADS_DIR, score.filename);
+    if (fsSync.existsSync(filepath)) {
+      res.download(filepath);
+    } else {
+      res.status(404).send('Archivo no encontrado');
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error al descargar');
+  }
 });
 
 app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
@@ -182,7 +187,6 @@ app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
   res.render('admin', { rhythms, scores, error: null, success: null });
 });
 
-// Agregar ritmo
 app.post('/admin/add-rhythm', requireLogin, requireAdmin, async (req, res) => {
   const { rhythmName } = req.body;
   if (!rhythmName || rhythmName.trim() === '') {
@@ -198,7 +202,6 @@ app.post('/admin/add-rhythm', requireLogin, requireAdmin, async (req, res) => {
   res.redirect('/admin?success=Ritmo agregado correctamente');
 });
 
-// Editar ritmo
 app.post('/admin/edit-rhythm/:id', requireLogin, requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   const { newName } = req.body;
@@ -216,7 +219,6 @@ app.post('/admin/edit-rhythm/:id', requireLogin, requireAdmin, async (req, res) 
   res.redirect('/admin?success=Ritmo editado correctamente');
 });
 
-// Eliminar ritmo
 app.post('/admin/delete-rhythm/:id', requireLogin, requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   let rhythms = await safeReadJSON(RHYTHMS_FILE, []);
@@ -232,28 +234,31 @@ app.post('/admin/delete-rhythm/:id', requireLogin, requireAdmin, async (req, res
   res.redirect('/admin?success=Ritmo eliminado');
 });
 
-// Subir partitura
 app.post('/admin/upload-score', requireLogin, requireAdmin, upload.single('pdf'), async (req, res) => {
-  const { title, rhythmId, instrument } = req.body;
-  if (!req.file || !title || !rhythmId || !instrument) {
-    return res.redirect('/admin?error=Complete todos los campos y seleccione un PDF');
+  try {
+    const { title, rhythmId, instrument } = req.body;
+    if (!req.file || !title || !rhythmId || !instrument) {
+      return res.redirect('/admin?error=Complete todos los campos y seleccione un PDF');
+    }
+    const scores = await safeReadJSON(SCORES_FILE, []);
+    const newId = scores.length ? Math.max(...scores.map(s => s.id)) + 1 : 1;
+    const newScore = {
+      id: newId,
+      title: title.trim(),
+      filename: req.file.filename,
+      rhythm_id: parseInt(rhythmId),
+      instrument: instrument,
+      upload_date: new Date().toISOString()
+    };
+    scores.push(newScore);
+    await writeJSON(SCORES_FILE, scores);
+    res.redirect('/admin?success=Partitura subida correctamente');
+  } catch (err) {
+    console.error(err);
+    res.redirect('/admin?error=Error al subir la partitura');
   }
-  const scores = await safeReadJSON(SCORES_FILE, []);
-  const newId = scores.length ? Math.max(...scores.map(s => s.id)) + 1 : 1;
-  const newScore = {
-    id: newId,
-    title: title.trim(),
-    filename: req.file.filename,
-    rhythm_id: parseInt(rhythmId),
-    instrument: instrument,
-    upload_date: new Date().toISOString()
-  };
-  scores.push(newScore);
-  await writeJSON(SCORES_FILE, scores);
-  res.redirect('/admin?success=Partitura subida correctamente');
 });
 
-// Editar partitura
 app.post('/admin/edit-score/:id', requireLogin, requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   const { title, rhythmId, instrument } = req.body;
@@ -271,7 +276,6 @@ app.post('/admin/edit-score/:id', requireLogin, requireAdmin, async (req, res) =
   res.redirect(referer);
 });
 
-// Eliminar partitura
 app.post('/admin/delete-score/:id', requireLogin, requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   let scores = await safeReadJSON(SCORES_FILE, []);
