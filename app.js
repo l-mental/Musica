@@ -1,5 +1,6 @@
 const express = require('express');
-const session = require('express-session');
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
@@ -7,18 +8,14 @@ const fsSync = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'emmfab_secret_jwt_carnaval_2026';
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(session({
-  secret: 'emmfab_secret_carnaval',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { maxAge: 3600000 }
-}));
+app.use(cookieParser());
 
 // ========== ALMACENAMIENTO LOCAL PERSISTENTE ==========
 const STORAGE_ROOT = process.env.STORAGE_PATH || path.join(__dirname, 'storage');
@@ -95,12 +92,22 @@ const upload = multer({
   }
 });
 
+// ========== MIDDLEWARE DE AUTENTICACIÓN CON JWT ==========
 function requireLogin(req, res, next) {
-  if (!req.session.user) return res.redirect('/login');
-  next();
+  const token = req.cookies.token;
+  if (!token) return res.redirect('/login');
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.clearCookie('token');
+    res.redirect('/login');
+  }
 }
+
 function requireAdmin(req, res, next) {
-  if (!req.session.user || req.session.user.role !== 'admin')
+  if (!req.user || req.user.role !== 'admin')
     return res.status(403).send('Acceso denegado. Solo administrador.');
   next();
 }
@@ -115,7 +122,12 @@ app.post('/login', async (req, res) => {
   const users = await safeReadJSON(USERS_FILE, []);
   const user = users.find(u => u.username === username && u.password === password);
   if (user) {
-    req.session.user = { id: user.id, username: user.username, role: user.role };
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    res.cookie('token', token, { httpOnly: true, maxAge: 24 * 60 * 60 * 1000 });
     res.redirect('/');
   } else {
     res.render('login', { error: 'Credenciales inválidas' });
@@ -123,7 +135,7 @@ app.post('/login', async (req, res) => {
 });
 
 app.get('/logout', (req, res) => {
-  req.session.destroy();
+  res.clearCookie('token');
   res.redirect('/login');
 });
 
@@ -153,7 +165,7 @@ app.get('/', requireLogin, async (req, res) => {
       rhythms,
       selectedRhythm: rhythm || '',
       selectedInstrument: instrument || 'todos',
-      isAdmin: req.session.user.role === 'admin'
+      isAdmin: req.user.role === 'admin'
     });
   } catch (err) {
     console.error(err);
@@ -176,6 +188,11 @@ app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
   res.render('admin', { rhythms, scores, error: null, success: null });
 });
 
+// Resto de rutas POST (add-rhythm, edit-rhythm, delete-rhythm, upload-score, etc.)
+// Se mantienen igual, pero reemplazando `req.session.user` por `req.user`
+// y usando `requireAdmin` igual.
+
+// Agregar ritmo
 app.post('/admin/add-rhythm', requireLogin, requireAdmin, async (req, res) => {
   const { rhythmName } = req.body;
   if (!rhythmName || rhythmName.trim() === '') {
@@ -191,6 +208,7 @@ app.post('/admin/add-rhythm', requireLogin, requireAdmin, async (req, res) => {
   res.redirect('/admin?success=Ritmo agregado correctamente');
 });
 
+// Editar ritmo
 app.post('/admin/edit-rhythm/:id', requireLogin, requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   const { newName } = req.body;
@@ -208,6 +226,7 @@ app.post('/admin/edit-rhythm/:id', requireLogin, requireAdmin, async (req, res) 
   res.redirect('/admin?success=Ritmo editado correctamente');
 });
 
+// Eliminar ritmo
 app.post('/admin/delete-rhythm/:id', requireLogin, requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   let rhythms = await safeReadJSON(RHYTHMS_FILE, []);
@@ -223,6 +242,7 @@ app.post('/admin/delete-rhythm/:id', requireLogin, requireAdmin, async (req, res
   res.redirect('/admin?success=Ritmo eliminado');
 });
 
+// Subir partitura
 app.post('/admin/upload-score', requireLogin, requireAdmin, upload.single('pdf'), async (req, res) => {
   try {
     const { title, rhythmId, instrument } = req.body;
@@ -248,6 +268,7 @@ app.post('/admin/upload-score', requireLogin, requireAdmin, upload.single('pdf')
   }
 });
 
+// Editar partitura
 app.post('/admin/edit-score/:id', requireLogin, requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   const { title, rhythmId, instrument } = req.body;
@@ -265,6 +286,7 @@ app.post('/admin/edit-score/:id', requireLogin, requireAdmin, async (req, res) =
   res.redirect(referer);
 });
 
+// Eliminar partitura
 app.post('/admin/delete-score/:id', requireLogin, requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   let scores = await safeReadJSON(SCORES_FILE, []);
@@ -289,19 +311,15 @@ initDataFiles().catch(err => {
 });
 
 if (require.main === module) {
-  // Si el puerto 3000 está ocupado, usa otro
   const server = app.listen(PORT, () => {
     console.log(`✅ Servidor local en http://localhost:${PORT}`);
     console.log(`📁 Datos guardados en: ${STORAGE_ROOT}`);
+    console.log(`🔐 Autenticación con JWT (sin sesiones en memoria)`);
   }).on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.log(`⚠️ El puerto ${PORT} está ocupado. Intentando puerto ${PORT + 1}...`);
-      app.listen(PORT + 1, () => {
-        console.log(`✅ Servidor local en http://localhost:${PORT + 1}`);
-      });
-    } else {
-      console.error(err);
-    }
+      console.log(`⚠️ Puerto ${PORT} ocupado. Usando ${PORT + 1}...`);
+      app.listen(PORT + 1, () => console.log(`✅ Servidor en http://localhost:${PORT + 1}`));
+    } else console.error(err);
   });
 }
 
