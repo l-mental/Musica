@@ -22,9 +22,16 @@ const STORAGE_ROOT = process.env.STORAGE_PATH || path.join(__dirname, 'storage')
 const DATA_DIR = path.join(STORAGE_ROOT, 'data');
 const UPLOADS_DIR = path.join(STORAGE_ROOT, 'uploads');
 
+// Función mejorada para crear directorios de forma recursiva
 async function ensureDirectories() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.mkdir(UPLOADS_DIR, { recursive: true });
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.mkdir(UPLOADS_DIR, { recursive: true });
+    console.log(`📁 Directorios listos: ${DATA_DIR}, ${UPLOADS_DIR}`);
+  } catch (err) {
+    console.error('Error creando directorios:', err);
+    throw err;
+  }
 }
 
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
@@ -188,11 +195,6 @@ app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
   res.render('admin', { rhythms, scores, error: null, success: null });
 });
 
-// Resto de rutas POST (add-rhythm, edit-rhythm, delete-rhythm, upload-score, etc.)
-// Se mantienen igual, pero reemplazando `req.session.user` por `req.user`
-// y usando `requireAdmin` igual.
-
-// Agregar ritmo
 app.post('/admin/add-rhythm', requireLogin, requireAdmin, async (req, res) => {
   const { rhythmName } = req.body;
   if (!rhythmName || rhythmName.trim() === '') {
@@ -208,7 +210,6 @@ app.post('/admin/add-rhythm', requireLogin, requireAdmin, async (req, res) => {
   res.redirect('/admin?success=Ritmo agregado correctamente');
 });
 
-// Editar ritmo
 app.post('/admin/edit-rhythm/:id', requireLogin, requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   const { newName } = req.body;
@@ -226,7 +227,6 @@ app.post('/admin/edit-rhythm/:id', requireLogin, requireAdmin, async (req, res) 
   res.redirect('/admin?success=Ritmo editado correctamente');
 });
 
-// Eliminar ritmo
 app.post('/admin/delete-rhythm/:id', requireLogin, requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   let rhythms = await safeReadJSON(RHYTHMS_FILE, []);
@@ -242,7 +242,6 @@ app.post('/admin/delete-rhythm/:id', requireLogin, requireAdmin, async (req, res
   res.redirect('/admin?success=Ritmo eliminado');
 });
 
-// Subir partitura
 app.post('/admin/upload-score', requireLogin, requireAdmin, upload.single('pdf'), async (req, res) => {
   try {
     const { title, rhythmId, instrument } = req.body;
@@ -263,12 +262,11 @@ app.post('/admin/upload-score', requireLogin, requireAdmin, upload.single('pdf')
     await writeJSON(SCORES_FILE, scores);
     res.redirect('/admin?success=Partitura subida correctamente');
   } catch (err) {
-    console.error(err);
-    res.redirect('/admin?error=Error al subir la partitura');
+    console.error('Error en upload:', err);
+    res.redirect('/admin?error=Error al subir la partitura: ' + err.message);
   }
 });
 
-// Editar partitura
 app.post('/admin/edit-score/:id', requireLogin, requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   const { title, rhythmId, instrument } = req.body;
@@ -286,7 +284,6 @@ app.post('/admin/edit-score/:id', requireLogin, requireAdmin, async (req, res) =
   res.redirect(referer);
 });
 
-// Eliminar partitura
 app.post('/admin/delete-score/:id', requireLogin, requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   let scores = await safeReadJSON(SCORES_FILE, []);
@@ -311,10 +308,10 @@ initDataFiles().catch(err => {
 });
 
 if (require.main === module) {
-  const server = app.listen(PORT, () => {
-    console.log(`✅ Servidor local en http://localhost:${PORT}`);
+  app.listen(PORT, () => {
+    console.log(`✅ Servidor en http://localhost:${PORT}`);
     console.log(`📁 Datos guardados en: ${STORAGE_ROOT}`);
-    console.log(`🔐 Autenticación con JWT (sin sesiones en memoria)`);
+    console.log(`🔐 Autenticación JWT activa`);
   }).on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.log(`⚠️ Puerto ${PORT} ocupado. Usando ${PORT + 1}...`);
