@@ -19,16 +19,8 @@ app.use(session({
   saveUninitialized: false,
   cookie: { maxAge: 3600000 }
 }));
-// Agrega esto después de app.use(session...)
-app.use((req, res, next) => {
-  // Log para depuración - elimina en producción
-  if (req.session.user) {
-    console.log('Usuario logueado:', req.session.user.username);
-  }
-  next();
-});
 
-// Configuración de almacenamiento
+// ========== ALMACENAMIENTO LOCAL PERSISTENTE ==========
 const STORAGE_ROOT = process.env.STORAGE_PATH || path.join(__dirname, 'storage');
 const DATA_DIR = path.join(STORAGE_ROOT, 'data');
 const UPLOADS_DIR = path.join(STORAGE_ROOT, 'uploads');
@@ -107,7 +99,6 @@ function requireLogin(req, res, next) {
   if (!req.session.user) return res.redirect('/login');
   next();
 }
-
 function requireAdmin(req, res, next) {
   if (!req.session.user || req.session.user.role !== 'admin')
     return res.status(403).send('Acceso denegado. Solo administrador.');
@@ -149,21 +140,14 @@ app.get('/', requireLogin, async (req, res) => {
 
     const { rhythm, instrument } = req.query;
     let filteredScores = [...scores];
-    
-    // Filtrar por ritmo (solo si rhythm existe y no está vacío)
     if (rhythm && rhythm !== '') {
       const rhythmObj = rhythms.find(r => r.name === rhythm);
-      if (rhythmObj) {
-        filteredScores = filteredScores.filter(s => s.rhythm_id === rhythmObj.id);
-      }
+      if (rhythmObj) filteredScores = filteredScores.filter(s => s.rhythm_id === rhythmObj.id);
     }
-    
-    // Filtrar por instrumento
-    if (instrument && instrument !== '' && instrument !== 'todos') {
+    if (instrument && instrument !== 'todos') {
       filteredScores = filteredScores.filter(s => s.instrument === instrument || s.instrument === 'ambos');
     }
 
-    // Siempre renderizar la página, nunca redirigir (excepto si no hay sesión - ya lo maneja requireLogin)
     res.render('index', {
       scores: filteredScores,
       rhythms,
@@ -173,32 +157,17 @@ app.get('/', requireLogin, async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    // En caso de error, mostrar la página igualmente sin partituras
-    res.render('index', {
-      scores: [],
-      rhythms: [],
-      selectedRhythm: '',
-      selectedInstrument: 'todos',
-      isAdmin: req.session.user ? req.session.user.role === 'admin' : false
-    });
+    res.status(500).send('Error cargando datos');
   }
 });
 
 app.get('/download/:id', requireLogin, async (req, res) => {
-  try {
-    const scores = await safeReadJSON(SCORES_FILE, []);
-    const score = scores.find(s => s.id == req.params.id);
-    if (!score) return res.status(404).send('Partitura no encontrada');
-    const filepath = path.join(UPLOADS_DIR, score.filename);
-    if (fsSync.existsSync(filepath)) {
-      res.download(filepath);
-    } else {
-      res.status(404).send('Archivo no encontrado');
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).send('Error al descargar');
-  }
+  const scores = await safeReadJSON(SCORES_FILE, []);
+  const score = scores.find(s => s.id == req.params.id);
+  if (!score) return res.status(404).send('Partitura no encontrada');
+  const filepath = path.join(UPLOADS_DIR, score.filename);
+  if (fsSync.existsSync(filepath)) res.download(filepath);
+  else res.status(404).send('Archivo no encontrado');
 });
 
 app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
@@ -212,7 +181,7 @@ app.post('/admin/add-rhythm', requireLogin, requireAdmin, async (req, res) => {
   if (!rhythmName || rhythmName.trim() === '') {
     return res.redirect('/admin?error=El nombre no puede estar vacío');
   }
-  const rhythms = await safeReadJSON(RHYTHMS_FILE, []);
+  let rhythms = await safeReadJSON(RHYTHMS_FILE, []);
   if (rhythms.some(r => r.name.toLowerCase() === rhythmName.trim().toLowerCase())) {
     return res.redirect('/admin?error=Ese ritmo ya existe');
   }
@@ -228,7 +197,7 @@ app.post('/admin/edit-rhythm/:id', requireLogin, requireAdmin, async (req, res) 
   if (!newName || newName.trim() === '') {
     return res.redirect('/admin?error=El nombre no puede estar vacío');
   }
-  const rhythms = await safeReadJSON(RHYTHMS_FILE, []);
+  let rhythms = await safeReadJSON(RHYTHMS_FILE, []);
   const index = rhythms.findIndex(r => r.id === id);
   if (index === -1) return res.redirect('/admin?error=Ritmo no encontrado');
   if (rhythms.some(r => r.id !== id && r.name.toLowerCase() === newName.trim().toLowerCase())) {
@@ -260,7 +229,7 @@ app.post('/admin/upload-score', requireLogin, requireAdmin, upload.single('pdf')
     if (!req.file || !title || !rhythmId || !instrument) {
       return res.redirect('/admin?error=Complete todos los campos y seleccione un PDF');
     }
-    const scores = await safeReadJSON(SCORES_FILE, []);
+    let scores = await safeReadJSON(SCORES_FILE, []);
     const newId = scores.length ? Math.max(...scores.map(s => s.id)) + 1 : 1;
     const newScore = {
       id: newId,
@@ -320,9 +289,19 @@ initDataFiles().catch(err => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, () => {
+  // Si el puerto 3000 está ocupado, usa otro
+  const server = app.listen(PORT, () => {
     console.log(`✅ Servidor local en http://localhost:${PORT}`);
     console.log(`📁 Datos guardados en: ${STORAGE_ROOT}`);
+  }).on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`⚠️ El puerto ${PORT} está ocupado. Intentando puerto ${PORT + 1}...`);
+      app.listen(PORT + 1, () => {
+        console.log(`✅ Servidor local en http://localhost:${PORT + 1}`);
+      });
+    } else {
+      console.error(err);
+    }
   });
 }
 
